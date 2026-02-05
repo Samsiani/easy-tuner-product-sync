@@ -246,6 +246,8 @@ class ET_Sync {
 
         $sync_id       = isset( $_POST['sync_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_id'] ) ) : '';
         $error_message = isset( $_POST['error_message'] ) ? sanitize_text_field( wp_unslash( $_POST['error_message'] ) ) : __( 'Unknown server error', 'easytuner-sync-pro' );
+        // The offset parameter is passed for debugging context but not currently stored.
+        // It can be useful to know at which batch offset the error occurred.
 
         // Clean up the transient
         if ( ! empty( $sync_id ) ) {
