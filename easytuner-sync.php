@@ -1,147 +1,286 @@
 <?php
 /**
- * Plugin Name: EasyTuner Product Sync (V1.5 - Final Image Fix)
- * Description: Fixes "A valid URL was not provided" by using manual download.
- * Version: 1.5
+ * Plugin Name: EasyTuner Sync Pro
+ * Plugin URI: https://easytuner.net
+ * Description: High-performance, secure WooCommerce product synchronization from EasyTuner API with category mapping, sync locking, and image deduplication.
+ * Version: 2.0.0
+ * Author: EasyTuner
+ * Author URI: https://easytuner.net
+ * Text Domain: easytuner-sync-pro
+ * Domain Path: /languages
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ * WC requires at least: 5.0
+ * WC tested up to: 8.5
+ *
+ * @package EasyTuner_Sync_Pro
  */
 
-if (!defined('ABSPATH')) exit;
-
-function et_get_api_token() {
-    $url = 'https://easytuner.net:8090/User/Login';
-    $response = wp_remote_post($url, array(
-        'sslverify' => false,
-        'body'      => array('Email' => 'easytuner01', 'Password' => 'easytuner01'),
-    ));
-    if (is_wp_error($response)) return false;
-    $body = json_decode(wp_remote_retrieve_body($response), true);
-    return isset($body['token']) ? $body['token'] : false;
+// Prevent direct access
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
 }
 
-// გაუმჯობესებული ფუნქცია - ხელით გადმოწერა
-function et_download_and_set_image($url, $post_id) {
-    if (empty($url)) return "Empty URL";
+// Define plugin constants
+define( 'ET_SYNC_VERSION', '2.0.0' );
+define( 'ET_SYNC_PLUGIN_FILE', __FILE__ );
+define( 'ET_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'ET_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'ET_SYNC_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
-    require_once(ABSPATH . 'wp-admin/includes/file.php');
-    require_once(ABSPATH . 'wp-admin/includes/media.php');
-    require_once(ABSPATH . 'wp-admin/includes/image.php');
+/**
+ * Main EasyTuner Sync Pro class.
+ *
+ * @since 2.0.0
+ */
+final class EasyTuner_Sync_Pro {
 
-    // 1. ფაილის წამოღება
-    $response = wp_remote_get($url, array(
-        'sslverify' => false,
-        'timeout'   => 30
-    ));
+    /**
+     * Single instance of the class.
+     *
+     * @var EasyTuner_Sync_Pro
+     */
+    private static $instance = null;
 
-    if (is_wp_error($response)) {
-        return "მოთხოვნის შეცდომა: " . $response->get_error_message();
+    /**
+     * API handler instance.
+     *
+     * @var ET_API
+     */
+    public $api;
+
+    /**
+     * Admin handler instance.
+     *
+     * @var ET_Admin
+     */
+    public $admin;
+
+    /**
+     * Sync handler instance.
+     *
+     * @var ET_Sync
+     */
+    public $sync;
+
+    /**
+     * Image handler instance.
+     *
+     * @var ET_Image
+     */
+    public $image;
+
+    /**
+     * Scheduler handler instance.
+     *
+     * @var ET_Scheduler
+     */
+    public $scheduler;
+
+    /**
+     * Logger instance.
+     *
+     * @var ET_Logger
+     */
+    public $logger;
+
+    /**
+     * Get single instance of the class.
+     *
+     * @return EasyTuner_Sync_Pro
+     */
+    public static function instance() {
+        if ( is_null( self::$instance ) ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
     }
 
-    $image_contents = wp_remote_retrieve_body($response);
-    $response_code   = wp_remote_retrieve_response_code($response);
-
-    if ($response_code !== 200 || empty($image_contents)) {
-        return "ვერ გადმოიწერა. კოდი: $response_code";
+    /**
+     * Constructor.
+     */
+    private function __construct() {
+        $this->includes();
+        $this->init_hooks();
     }
 
-    // 2. დროებითი ფაილის შექმნა
-    $filename = basename($url);
-    $upload = wp_upload_bits($filename, null, $image_contents);
-
-    if ($upload['error']) {
-        return "ფაილის შენახვის შეცდომა: " . $upload['error'];
+    /**
+     * Include required files.
+     */
+    private function includes() {
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-api.php';
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-image.php';
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-logger.php';
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-sync.php';
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-scheduler.php';
+        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-admin.php';
     }
 
-    // 3. მედია ბიბლიოთეკაში რეგისტრაცია
-    $file_path = $upload['file'];
-    $file_name = basename($file_path);
-    $file_type = wp_check_filetype($file_name, null);
+    /**
+     * Initialize hooks.
+     */
+    private function init_hooks() {
+        // Register activation/deactivation hooks
+        register_activation_hook( ET_SYNC_PLUGIN_FILE, array( $this, 'activate' ) );
+        register_deactivation_hook( ET_SYNC_PLUGIN_FILE, array( $this, 'deactivate' ) );
 
-    $attachment = array(
-        'post_mime_type' => $file_type['type'],
-        'post_title'     => sanitize_file_name($file_name),
-        'post_content'   => '',
-        'post_status'    => 'inherit'
-    );
+        // Initialize plugin after plugins are loaded
+        add_action( 'plugins_loaded', array( $this, 'init' ) );
 
-    $attach_id = wp_insert_attachment($attachment, $file_path, $post_id);
-    require_once(ABSPATH . 'wp-admin/includes/image.php');
-    $attach_data = wp_generate_attachment_metadata($attach_id, $file_path);
-    wp_update_attachment_metadata($attach_id, $attach_data);
-
-    set_post_thumbnail($post_id, $attach_id);
-    return "წარმატებულია! ID: " . $attach_id;
-}
-
-function et_process_single_item($item, $inventory_name) {
-    $sku = $item['id'];
-    $product_id = wc_get_product_id_by_sku($sku);
-
-    if ($product_id) {
-        $product = wc_get_product($product_id);
-    } else {
-        $product = new WC_Product_Simple();
-        $product->set_sku($sku);
+        // Add SSL bypass filter for EasyTuner API
+        add_filter( 'https_ssl_verify', array( $this, 'bypass_ssl_for_easytuner' ), 10, 2 );
+        add_filter( 'https_local_ssl_verify', array( $this, 'bypass_ssl_for_easytuner' ), 10, 2 );
     }
 
-    $product->set_name($item['name']);
-    $product->set_regular_price($item['sellingPrice']);
-    $product->set_stock_quantity((int)$item['stock']);
-    $product->set_manage_stock(true);
-    $product->set_status('publish');
+    /**
+     * Initialize plugin components.
+     */
+    public function init() {
+        // Check if WooCommerce is active
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            add_action( 'admin_notices', array( $this, 'woocommerce_missing_notice' ) );
+            return;
+        }
 
-    $category = get_term_by('name', $inventory_name, 'product_cat');
-    $cat_id = $category ? $category->term_id : wp_insert_term($inventory_name, 'product_cat')['term_id'];
-    $product->set_category_ids(array($cat_id));
+        // Initialize components
+        $this->api       = new ET_API();
+        $this->image     = new ET_Image();
+        $this->logger    = new ET_Logger();
+        $this->sync      = new ET_Sync();
+        $this->scheduler = new ET_Scheduler();
 
-    $saved_id = $product->save();
+        // Initialize admin only in admin context
+        if ( is_admin() ) {
+            $this->admin = new ET_Admin();
+        }
 
-    $image_log = "No Image URL";
-    if (!empty($item['photoIds']) && isset($item['photoIds'][0])) {
-        $image_log = et_download_and_set_image($item['photoIds'][0], $saved_id);
+        // Load text domain for translations
+        load_plugin_textdomain( 'easytuner-sync-pro', false, dirname( ET_SYNC_PLUGIN_BASENAME ) . '/languages' );
     }
 
-    return array('id' => $saved_id, 'log' => $image_log);
-}
+    /**
+     * Plugin activation.
+     */
+    public function activate() {
+        // Create sync log table
+        $this->create_log_table();
 
-add_action('admin_menu', function() {
-    add_menu_page('EasyTuner Sync', 'EasyTuner Sync', 'manage_options', 'et-sync', 'et_sync_page');
-});
+        // Set default options
+        $this->set_default_options();
 
-function et_sync_page() {
-    ?>
-    <div class="wrap">
-        <h1>EasyTuner Sync (V1.5)</h1>
-        <form method="post">
-            <input type="submit" name="test_sync" class="button button-primary" value="1 პროდუქტის ტესტირება">
-            <input type="submit" name="full_sync" class="button button-secondary" value="სრული სინქრონიზაცია">
-        </form>
-        <?php
-        if (isset($_POST['test_sync']) || isset($_POST['full_sync'])) {
-            $token = et_get_api_token();
-            if (!$token) { echo "ტოკენის შეცდომა."; return; }
-
-            $url = 'https://easytuner.net:8090/Data/GetAllInventories';
-            $response = wp_remote_get($url, array('sslverify' => false, 'headers' => array('Authorization' => 'Bearer ' . $token)));
-            $data = json_decode(wp_remote_retrieve_body($response), true);
-
-            if (isset($_POST['test_sync'])) {
-                $res = et_process_single_item($data[0]['items'][0], $data[0]['name']);
-                echo "<div class='updated notice'><p>სტატუსი: <strong>" . $res['log'] . "</strong></p>
-                <p><a href='".get_edit_post_link($res['id'])."' target='_blank'>პროდუქტის ნახვა</a></p></div>";
-            }
-            
-            if (isset($_POST['full_sync'])) {
-                $count = 0;
-                foreach ($data as $inv) {
-                    foreach ($inv['items'] as $item) {
-                        et_process_single_item($item, $inv['name']);
-                        $count++;
-                    }
-                }
-                echo "<div class='updated notice'><p>განახლდა $count პროდუქტი.</p></div>";
+        // Schedule daily sync if Action Scheduler is available
+        if ( function_exists( 'as_schedule_recurring_action' ) ) {
+            if ( ! as_next_scheduled_action( 'et_sync_scheduled_task' ) ) {
+                as_schedule_recurring_action( strtotime( 'tomorrow 3:00am' ), DAY_IN_SECONDS, 'et_sync_scheduled_task' );
             }
         }
+
+        // Flush rewrite rules
+        flush_rewrite_rules();
+    }
+
+    /**
+     * Plugin deactivation.
+     */
+    public function deactivate() {
+        // Unschedule Action Scheduler tasks
+        if ( function_exists( 'as_unschedule_all_actions' ) ) {
+            as_unschedule_all_actions( 'et_sync_scheduled_task' );
+            as_unschedule_all_actions( 'et_sync_batch_process' );
+        }
+
+        // Flush rewrite rules
+        flush_rewrite_rules();
+    }
+
+    /**
+     * Create sync log database table.
+     */
+    private function create_log_table() {
+        global $wpdb;
+
+        $table_name      = $wpdb->prefix . 'et_sync_logs';
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            sync_date datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            sync_type varchar(50) NOT NULL DEFAULT 'manual',
+            products_updated int(11) NOT NULL DEFAULT 0,
+            products_created int(11) NOT NULL DEFAULT 0,
+            errors_count int(11) NOT NULL DEFAULT 0,
+            error_details longtext,
+            status varchar(20) NOT NULL DEFAULT 'completed',
+            PRIMARY KEY (id),
+            KEY sync_date (sync_date),
+            KEY status (status)
+        ) $charset_collate;";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta( $sql );
+    }
+
+    /**
+     * Set default plugin options.
+     */
+    private function set_default_options() {
+        $defaults = array(
+            'et_api_email'        => '',
+            'et_api_password'     => '',
+            'et_category_mapping' => array(),
+            'et_sync_batch_size'  => 20,
+            'et_auto_sync'        => 0,
+        );
+
+        foreach ( $defaults as $key => $value ) {
+            if ( false === get_option( $key ) ) {
+                add_option( $key, $value );
+            }
+        }
+    }
+
+    /**
+     * Bypass SSL verification for EasyTuner API.
+     *
+     * @param bool   $verify Whether to verify SSL certificate.
+     * @param string $url    The URL being requested.
+     * @return bool
+     */
+    public function bypass_ssl_for_easytuner( $verify, $url ) {
+        if ( strpos( $url, 'easytuner.net:8090' ) !== false ) {
+            return false;
+        }
+        return $verify;
+    }
+
+    /**
+     * Display WooCommerce missing notice.
+     */
+    public function woocommerce_missing_notice() {
         ?>
-    </div>
-    <?php
+        <div class="notice notice-error">
+            <p>
+                <?php
+                printf(
+                    /* translators: %s: WooCommerce plugin name */
+                    esc_html__( 'EasyTuner Sync Pro requires %s to be installed and activated.', 'easytuner-sync-pro' ),
+                    '<strong>WooCommerce</strong>'
+                );
+                ?>
+            </p>
+        </div>
+        <?php
+    }
 }
+
+/**
+ * Get the main instance of EasyTuner Sync Pro.
+ *
+ * @return EasyTuner_Sync_Pro
+ */
+function ET_Sync() {
+    return EasyTuner_Sync_Pro::instance();
+}
+
+// Initialize the plugin
+ET_Sync();
