@@ -309,15 +309,70 @@
                         processBatch(processedProducts);
                     }
                 } else {
-                    showMessage($('#et-sync-result'), response.data.message, 'error');
-                    resetSyncUI($('#et-start-sync'));
+                    // Handle fatal error response from server
+                    var errorMessage = response.data.message || i18n.syncFailed;
+                    if (response.data.fatal) {
+                        errorMessage = 'Fatal Error: ' + errorMessage;
+                    }
+                    showMessage($('#et-sync-result'), errorMessage, 'error');
+                    syncFailed(errorMessage);
                 }
             },
-            error: function() {
-                showMessage($('#et-sync-result'), i18n.syncFailed, 'error');
-                resetSyncUI($('#et-start-sync'));
+            error: function(jqXHR, textStatus, errorThrown) {
+                // Server error (500, timeout, etc.)
+                var errorMessage = 'Server Error';
+                if (textStatus === 'timeout') {
+                    errorMessage = 'Server Timeout: The request took too long to complete.';
+                } else if (jqXHR.status === 500) {
+                    errorMessage = 'Server Error (500): Internal Server Error. The sync has been interrupted.';
+                } else if (jqXHR.status === 0) {
+                    errorMessage = 'Connection Error: Unable to reach the server.';
+                } else {
+                    errorMessage = 'Server Error (' + (jqXHR.status || textStatus) + '): ' + (errorThrown || 'Unknown error occurred.');
+                }
+
+                showMessage($('#et-sync-result'), errorMessage, 'error');
+
+                // Attempt to log the server error via a separate AJAX call
+                logServerError(errorMessage, offset);
+
+                syncFailed(errorMessage);
             }
         });
+    }
+
+    /**
+     * Attempt to log a server error via AJAX.
+     *
+     * @param {string} errorMessage The error message to log.
+     * @param {number} offset       The offset where the error occurred.
+     */
+    function logServerError(errorMessage, offset) {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'et_sync_log_error',
+                nonce: nonce,
+                sync_id: currentSyncId,
+                error_message: errorMessage,
+                offset: offset
+            },
+            // We don't care about the response here, just try to log
+            error: function() {
+                // Silently fail - we've already shown the error to the user
+            }
+        });
+    }
+
+    /**
+     * Handle sync failure.
+     *
+     * @param {string} errorMessage Error message.
+     */
+    function syncFailed(errorMessage) {
+        updateProgressDetails('Sync failed: ' + errorMessage);
+        resetSyncUI($('#et-start-sync'));
     }
 
     /**

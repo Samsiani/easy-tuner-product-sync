@@ -153,13 +153,18 @@ class ET_Logger {
 
         global $wpdb;
 
+        $error_details = wp_json_encode( $this->errors );
+        if ( false === $error_details ) {
+            $error_details = '[]';
+        }
+
         $wpdb->update(
             $this->table_name,
             array(
-                'products_updated' => $this->products_updated,
-                'products_created' => $this->products_created,
-                'errors_count'     => count( $this->errors ),
-                'error_details'    => wp_json_encode( $this->errors ),
+                'products_updated' => absint( $this->products_updated ),
+                'products_created' => absint( $this->products_created ),
+                'errors_count'     => absint( count( $this->errors ) ),
+                'error_details'    => $error_details,
                 'status'           => sanitize_text_field( $status ),
             ),
             array( 'id' => $this->current_log_id ),
@@ -168,6 +173,22 @@ class ET_Logger {
         );
 
         $this->current_log_id = null;
+    }
+
+    /**
+     * Mark the current sync log as failed.
+     *
+     * This method should be used when a fatal error is detected to ensure
+     * the log entry is properly closed and not left in "in_progress" status.
+     *
+     * @param string $message Error message to record.
+     */
+    public function mark_as_failed( $message ) {
+        // Record the error first
+        $this->record_error( $message, '', 'fatal_error' );
+
+        // Complete the log with 'failed' status
+        $this->complete_log( 'failed' );
     }
 
     /**
@@ -180,13 +201,18 @@ class ET_Logger {
 
         global $wpdb;
 
+        $error_details = wp_json_encode( $this->errors );
+        if ( false === $error_details ) {
+            $error_details = '[]';
+        }
+
         $wpdb->update(
             $this->table_name,
             array(
-                'products_updated' => $this->products_updated,
-                'products_created' => $this->products_created,
-                'errors_count'     => count( $this->errors ),
-                'error_details'    => wp_json_encode( $this->errors ),
+                'products_updated' => absint( $this->products_updated ),
+                'products_created' => absint( $this->products_created ),
+                'errors_count'     => absint( count( $this->errors ) ),
+                'error_details'    => $error_details,
             ),
             array( 'id' => $this->current_log_id ),
             array( '%d', '%d', '%d', '%s' ),
