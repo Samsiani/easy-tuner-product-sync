@@ -99,9 +99,15 @@ class ET_Image {
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        // Download the image with SSL bypass
+        // Only bypass SSL for EasyTuner API URLs (port 8090)
+        $ssl_verify = true;
+        if ( strpos( $url, 'easytuner.net:8090' ) !== false ) {
+            $ssl_verify = false;
+        }
+
+        // Download the image
         $response = wp_remote_get( $url, array(
-            'sslverify' => false,
+            'sslverify' => $ssl_verify,
             'timeout'   => 60,
         ) );
 

@@ -25,7 +25,7 @@ class ET_Sync {
      *
      * @var int
      */
-    private $batch_size = 20;
+    private $batch_size;
 
     /**
      * Constructor.
