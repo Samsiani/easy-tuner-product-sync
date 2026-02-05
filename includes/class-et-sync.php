@@ -98,6 +98,7 @@ class ET_Sync {
         }
 
         $sync_id = isset( $_POST['sync_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_id'] ) ) : '';
+        $log_id  = isset( $_POST['log_id'] ) ? absint( $_POST['log_id'] ) : 0;
         $offset  = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
 
         if ( empty( $sync_id ) ) {
@@ -120,6 +121,11 @@ class ET_Sync {
         );
 
         $logger = ET_Sync()->logger;
+
+        // Set log ID to persist state across AJAX requests
+        if ( $log_id > 0 ) {
+            $logger->set_log_id( $log_id );
+        }
 
         try {
             foreach ( $batch as $product_data ) {
@@ -245,6 +251,7 @@ class ET_Sync {
         }
 
         $sync_id       = isset( $_POST['sync_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_id'] ) ) : '';
+        $log_id        = isset( $_POST['log_id'] ) ? absint( $_POST['log_id'] ) : 0;
         $error_message = isset( $_POST['error_message'] ) ? sanitize_text_field( wp_unslash( $_POST['error_message'] ) ) : __( 'Unknown server error', 'easytuner-sync-pro' );
         // The offset parameter is passed for debugging context but not currently stored.
         // It can be useful to know at which batch offset the error occurred.
@@ -256,6 +263,12 @@ class ET_Sync {
 
         // Mark the log as failed
         $logger = ET_Sync()->logger;
+
+        // Set log ID to persist state across AJAX requests
+        if ( $log_id > 0 ) {
+            $logger->set_log_id( $log_id );
+        }
+
         $logger->mark_as_failed( $error_message );
 
         wp_send_json_success( array(

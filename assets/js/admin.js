@@ -215,6 +215,7 @@
      */
     var syncInProgress = false;
     var currentSyncId = null;
+    var currentLogId = null;
     var totalProducts = 0;
     var processedProducts = 0;
     var syncResults = { created: 0, updated: 0, errors: [] };
@@ -236,6 +237,7 @@
         syncInProgress = true;
         processedProducts = 0;
         syncResults = { created: 0, updated: 0, errors: [] };
+        currentLogId = null;
 
         $btn.text(i18n.syncStarting).prop('disabled', true);
         hideMessage($result);
@@ -253,6 +255,7 @@
             success: function(response) {
                 if (response.success) {
                     currentSyncId = response.data.sync_id;
+                    currentLogId = response.data.log_id;
                     totalProducts = response.data.total_products;
                     updateProgressDetails(response.data.message);
                     
@@ -287,6 +290,7 @@
                 action: 'et_sync_process_batch',
                 nonce: nonce,
                 sync_id: currentSyncId,
+                log_id: currentLogId,
                 offset: offset
             },
             success: function(response) {
@@ -355,6 +359,7 @@
                 action: 'et_sync_log_error',
                 nonce: nonce,
                 sync_id: currentSyncId,
+                log_id: currentLogId,
                 error_message: errorMessage,
                 offset: offset
             },
@@ -423,6 +428,7 @@
     function resetSyncUI($btn) {
         syncInProgress = false;
         currentSyncId = null;
+        currentLogId = null;
         $btn.text('Start Sync').prop('disabled', false);
     }
 
@@ -457,6 +463,95 @@
         }
 
         $modal.show();
+    });
+
+    /**
+     * Sync Logs Tab - Delete Single Log.
+     */
+    $(document).on('click', '.et-delete-log', function() {
+        if (!confirm(i18n.confirmDeleteLog)) {
+            return;
+        }
+
+        var $btn = $(this);
+        var $row = $btn.closest('tr');
+        var logId = $btn.data('log-id');
+        var $result = $('#et-logs-result');
+        var originalText = $btn.text();
+
+        $btn.text(i18n.deletingLog).prop('disabled', true);
+        hideMessage($result);
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'et_delete_log',
+                nonce: nonce,
+                log_id: logId
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Remove the row from the table
+                    $row.fadeOut(300, function() {
+                        $(this).remove();
+                        // If no more rows, reload to show empty message
+                        if ($('#et-logs-table tbody tr').length === 0) {
+                            location.reload();
+                        }
+                    });
+                    showMessage($result, response.data.message, 'success');
+                } else {
+                    showMessage($result, response.data.message, 'error');
+                    $btn.text(originalText).prop('disabled', false);
+                }
+            },
+            error: function() {
+                showMessage($result, i18n.deleteError, 'error');
+                $btn.text(originalText).prop('disabled', false);
+            }
+        });
+    });
+
+    /**
+     * Sync Logs Tab - Clear All Logs.
+     */
+    $('#et-clear-all-logs').on('click', function() {
+        if (!confirm(i18n.confirmClearLogs)) {
+            return;
+        }
+
+        var $btn = $(this);
+        var $result = $('#et-logs-result');
+        var originalText = $btn.text();
+
+        $btn.text(i18n.clearingLogs).prop('disabled', true);
+        hideMessage($result);
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'et_clear_all_logs',
+                nonce: nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    showMessage($result, response.data.message, 'success');
+                    // Reload the page to refresh the logs table
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showMessage($result, response.data.message, 'error');
+                    $btn.text(originalText).prop('disabled', false);
+                }
+            },
+            error: function() {
+                showMessage($result, i18n.deleteError, 'error');
+                $btn.text(originalText).prop('disabled', false);
+            }
+        });
     });
 
     /**

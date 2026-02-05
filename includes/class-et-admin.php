@@ -37,6 +37,8 @@ class ET_Admin {
         add_action( 'wp_ajax_et_fetch_categories', array( $this, 'ajax_fetch_categories' ) );
         add_action( 'wp_ajax_et_save_mapping', array( $this, 'ajax_save_mapping' ) );
         add_action( 'wp_ajax_et_save_settings', array( $this, 'ajax_save_settings' ) );
+        add_action( 'wp_ajax_et_delete_log', array( $this, 'ajax_delete_log' ) );
+        add_action( 'wp_ajax_et_clear_all_logs', array( $this, 'ajax_clear_all_logs' ) );
     }
 
     /**
@@ -86,17 +88,24 @@ class ET_Admin {
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'nonce'   => wp_create_nonce( 'et_sync_nonce' ),
             'i18n'    => array(
-                'testingConnection' => __( 'Testing connection...', 'easytuner-sync-pro' ),
-                'connectionSuccess' => __( 'Connection successful!', 'easytuner-sync-pro' ),
-                'connectionFailed'  => __( 'Connection failed.', 'easytuner-sync-pro' ),
+                'testingConnection'  => __( 'Testing connection...', 'easytuner-sync-pro' ),
+                'connectionSuccess'  => __( 'Connection successful!', 'easytuner-sync-pro' ),
+                'connectionFailed'   => __( 'Connection failed.', 'easytuner-sync-pro' ),
                 'fetchingCategories' => __( 'Fetching categories...', 'easytuner-sync-pro' ),
-                'savingSettings'    => __( 'Saving settings...', 'easytuner-sync-pro' ),
-                'settingsSaved'     => __( 'Settings saved!', 'easytuner-sync-pro' ),
-                'syncStarting'      => __( 'Starting sync...', 'easytuner-sync-pro' ),
-                'syncComplete'      => __( 'Sync completed!', 'easytuner-sync-pro' ),
-                'syncFailed'        => __( 'Sync failed.', 'easytuner-sync-pro' ),
-                'processing'        => __( 'Processing...', 'easytuner-sync-pro' ),
-                'confirmSync'       => __( 'Are you sure you want to start the sync?', 'easytuner-sync-pro' ),
+                'savingSettings'     => __( 'Saving settings...', 'easytuner-sync-pro' ),
+                'settingsSaved'      => __( 'Settings saved!', 'easytuner-sync-pro' ),
+                'syncStarting'       => __( 'Starting sync...', 'easytuner-sync-pro' ),
+                'syncComplete'       => __( 'Sync completed!', 'easytuner-sync-pro' ),
+                'syncFailed'         => __( 'Sync failed.', 'easytuner-sync-pro' ),
+                'processing'         => __( 'Processing...', 'easytuner-sync-pro' ),
+                'confirmSync'        => __( 'Are you sure you want to start the sync?', 'easytuner-sync-pro' ),
+                'confirmDeleteLog'   => __( 'Are you sure you want to delete this log entry?', 'easytuner-sync-pro' ),
+                'confirmClearLogs'   => __( 'Are you sure you want to delete ALL log entries? This cannot be undone.', 'easytuner-sync-pro' ),
+                'deletingLog'        => __( 'Deleting...', 'easytuner-sync-pro' ),
+                'clearingLogs'       => __( 'Clearing logs...', 'easytuner-sync-pro' ),
+                'logDeleted'         => __( 'Log entry deleted.', 'easytuner-sync-pro' ),
+                'logsCleared'        => __( 'All logs cleared.', 'easytuner-sync-pro' ),
+                'deleteError'        => __( 'Failed to delete log.', 'easytuner-sync-pro' ),
             ),
         ) );
     }
@@ -412,10 +421,20 @@ class ET_Admin {
         <div class="et-sync-logs">
             <h2><?php esc_html_e( 'Sync Logs', 'easytuner-sync-pro' ); ?></h2>
 
+            <?php if ( ! empty( $logs ) ) : ?>
+                <p>
+                    <button type="button" class="button" id="et-clear-all-logs">
+                        <?php esc_html_e( 'Clear All Logs', 'easytuner-sync-pro' ); ?>
+                    </button>
+                </p>
+            <?php endif; ?>
+
+            <div id="et-logs-result" class="et-result-message" style="display:none;"></div>
+
             <?php if ( empty( $logs ) ) : ?>
                 <p><?php esc_html_e( 'No sync logs available.', 'easytuner-sync-pro' ); ?></p>
             <?php else : ?>
-                <table class="widefat striped">
+                <table class="widefat striped" id="et-logs-table">
                     <thead>
                         <tr>
                             <th><?php esc_html_e( 'Date', 'easytuner-sync-pro' ); ?></th>
@@ -424,12 +443,12 @@ class ET_Admin {
                             <th><?php esc_html_e( 'Updated', 'easytuner-sync-pro' ); ?></th>
                             <th><?php esc_html_e( 'Errors', 'easytuner-sync-pro' ); ?></th>
                             <th><?php esc_html_e( 'Status', 'easytuner-sync-pro' ); ?></th>
-                            <th><?php esc_html_e( 'Details', 'easytuner-sync-pro' ); ?></th>
+                            <th><?php esc_html_e( 'Actions', 'easytuner-sync-pro' ); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ( $logs as $log ) : ?>
-                            <tr>
+                            <tr data-log-id="<?php echo esc_attr( $log['id'] ); ?>">
                                 <td><?php echo esc_html( wp_date( 'M j, Y g:i a', strtotime( $log['sync_date'] ) ) ); ?></td>
                                 <td><?php echo esc_html( ucfirst( $log['sync_type'] ) ); ?></td>
                                 <td><?php echo esc_html( $log['products_created'] ); ?></td>
@@ -452,9 +471,11 @@ class ET_Admin {
                                                 data-errors="<?php echo esc_attr( wp_json_encode( $log['error_details'] ) ); ?>">
                                             <?php esc_html_e( 'View Errors', 'easytuner-sync-pro' ); ?>
                                         </button>
-                                    <?php else : ?>
-                                        -
                                     <?php endif; ?>
+                                    <button type="button" class="button button-small et-delete-log"
+                                            data-log-id="<?php echo esc_attr( $log['id'] ); ?>">
+                                        <?php esc_html_e( 'Delete', 'easytuner-sync-pro' ); ?>
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -615,5 +636,51 @@ class ET_Admin {
         $scheduler->schedule_daily_sync();
 
         wp_send_json_success( array( 'message' => __( 'Settings saved successfully!', 'easytuner-sync-pro' ) ) );
+    }
+
+    /**
+     * AJAX handler for deleting a single log entry.
+     */
+    public function ajax_delete_log() {
+        check_ajax_referer( 'et_sync_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
+        }
+
+        $log_id = isset( $_POST['log_id'] ) ? absint( $_POST['log_id'] ) : 0;
+
+        if ( $log_id <= 0 ) {
+            wp_send_json_error( array( 'message' => __( 'Invalid log ID.', 'easytuner-sync-pro' ) ) );
+        }
+
+        $logger = ET_Sync()->logger;
+        $result = $logger->delete_log( $log_id );
+
+        if ( $result ) {
+            wp_send_json_success( array( 'message' => __( 'Log entry deleted successfully.', 'easytuner-sync-pro' ) ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( 'Failed to delete log entry.', 'easytuner-sync-pro' ) ) );
+        }
+    }
+
+    /**
+     * AJAX handler for clearing all log entries.
+     */
+    public function ajax_clear_all_logs() {
+        check_ajax_referer( 'et_sync_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
+        }
+
+        $logger = ET_Sync()->logger;
+        $result = $logger->delete_all_logs();
+
+        if ( false !== $result ) {
+            wp_send_json_success( array( 'message' => __( 'All log entries cleared successfully.', 'easytuner-sync-pro' ) ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( 'Failed to clear log entries.', 'easytuner-sync-pro' ) ) );
+        }
     }
 }
