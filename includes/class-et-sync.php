@@ -37,6 +37,7 @@ class ET_Sync {
         add_action( 'wp_ajax_et_sync_start', array( $this, 'ajax_start_sync' ) );
         add_action( 'wp_ajax_et_sync_process_batch', array( $this, 'ajax_process_batch' ) );
         add_action( 'wp_ajax_et_sync_get_status', array( $this, 'ajax_get_sync_status' ) );
+        add_action( 'wp_ajax_et_sync_log_error', array( $this, 'ajax_log_error' ) );
     }
 
     /**
@@ -120,50 +121,79 @@ class ET_Sync {
 
         $logger = ET_Sync()->logger;
 
-        foreach ( $batch as $product_data ) {
-            $result = $this->sync_product( $product_data );
+        try {
+            foreach ( $batch as $product_data ) {
+                try {
+                    $result = $this->sync_product( $product_data );
 
-            if ( isset( $result['error'] ) ) {
-                $results['errors'][] = $result['error'];
-                $logger->record_error(
-                    $result['error'],
-                    isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
-                );
-            } elseif ( $result['action'] === 'created' ) {
-                $results['created']++;
-                $logger->record_created( $result['product_id'], $result['sku'] );
-            } elseif ( $result['action'] === 'updated' ) {
-                $results['updated']++;
-                $logger->record_updated( $result['product_id'], $result['sku'] );
+                    if ( isset( $result['error'] ) ) {
+                        $results['errors'][] = $result['error'];
+                        $logger->record_error(
+                            $result['error'],
+                            isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
+                        );
+                    } elseif ( $result['action'] === 'created' ) {
+                        $results['created']++;
+                        $logger->record_created( $result['product_id'], $result['sku'] );
+                    } elseif ( $result['action'] === 'updated' ) {
+                        $results['updated']++;
+                        $logger->record_updated( $result['product_id'], $result['sku'] );
+                    }
+                } catch ( Exception $e ) {
+                    $error_message = sprintf(
+                        /* translators: 1: SKU, 2: Error message */
+                        __( 'Exception processing SKU %1$s: %2$s', 'easytuner-sync-pro' ),
+                        isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : 'unknown',
+                        $e->getMessage()
+                    );
+                    $results['errors'][] = $error_message;
+                    $logger->record_error(
+                        $error_message,
+                        isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
+                    );
+                }
             }
-        }
 
-        $new_offset   = $offset + count( $batch );
-        $is_complete  = $new_offset >= count( $products );
+            $new_offset   = $offset + count( $batch );
+            $is_complete  = $new_offset >= count( $products );
 
-        if ( $is_complete ) {
-            // Complete the log
-            $logger->complete_log( empty( $results['errors'] ) ? 'completed' : 'partial' );
-            // Delete the transient
+            if ( $is_complete ) {
+                // Complete the log
+                $logger->complete_log( empty( $results['errors'] ) ? 'completed' : 'partial' );
+                // Delete the transient
+                delete_transient( $sync_id );
+            }
+
+            wp_send_json_success( array(
+                'processed' => $new_offset,
+                'total'     => count( $products ),
+                'created'   => $results['created'],
+                'updated'   => $results['updated'],
+                'errors'    => $results['errors'],
+                'complete'  => $is_complete,
+                'message'   => $is_complete
+                    ? __( 'Sync completed successfully!', 'easytuner-sync-pro' )
+                    : sprintf(
+                        /* translators: 1: Processed count, 2: Total count */
+                        __( 'Processed %1$d of %2$d products...', 'easytuner-sync-pro' ),
+                        $new_offset,
+                        count( $products )
+                    ),
+            ) );
+        } catch ( Exception $e ) {
+            // Fatal error during batch processing - mark log as failed
+            $logger->mark_as_failed( $e->getMessage() );
             delete_transient( $sync_id );
-        }
 
-        wp_send_json_success( array(
-            'processed' => $new_offset,
-            'total'     => count( $products ),
-            'created'   => $results['created'],
-            'updated'   => $results['updated'],
-            'errors'    => $results['errors'],
-            'complete'  => $is_complete,
-            'message'   => $is_complete
-                ? __( 'Sync completed successfully!', 'easytuner-sync-pro' )
-                : sprintf(
-                    /* translators: 1: Processed count, 2: Total count */
-                    __( 'Processed %1$d of %2$d products...', 'easytuner-sync-pro' ),
-                    $new_offset,
-                    count( $products )
+            wp_send_json_error( array(
+                'message' => sprintf(
+                    /* translators: %s: Error message */
+                    __( 'Fatal error during sync: %s', 'easytuner-sync-pro' ),
+                    $e->getMessage()
                 ),
-        ) );
+                'fatal' => true,
+            ) );
+        }
     }
 
     /**
@@ -196,6 +226,40 @@ class ET_Sync {
         wp_send_json_success( array(
             'running'    => false,
             'latest_log' => $latest_log,
+        ) );
+    }
+
+    /**
+     * AJAX handler to log a server-side error from the client.
+     *
+     * This is used when the client detects a server error (500, timeout, etc.)
+     * and wants to ensure the sync log is properly marked as failed.
+     */
+    public function ajax_log_error() {
+        // Verify nonce
+        check_ajax_referer( 'et_sync_nonce', 'nonce' );
+
+        // Check user capabilities
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
+        }
+
+        $sync_id       = isset( $_POST['sync_id'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_id'] ) ) : '';
+        $error_message = isset( $_POST['error_message'] ) ? sanitize_text_field( wp_unslash( $_POST['error_message'] ) ) : __( 'Unknown server error', 'easytuner-sync-pro' );
+        // The offset parameter is passed for debugging context but not currently stored.
+        // It can be useful to know at which batch offset the error occurred.
+
+        // Clean up the transient
+        if ( ! empty( $sync_id ) ) {
+            delete_transient( $sync_id );
+        }
+
+        // Mark the log as failed
+        $logger = ET_Sync()->logger;
+        $logger->mark_as_failed( $error_message );
+
+        wp_send_json_success( array(
+            'message' => __( 'Error logged successfully.', 'easytuner-sync-pro' ),
         ) );
     }
 
@@ -393,29 +457,53 @@ class ET_Sync {
             'errors'  => 0,
         );
 
-        foreach ( $products as $product_data ) {
-            $result = $this->sync_product( $product_data );
+        try {
+            foreach ( $products as $product_data ) {
+                try {
+                    $result = $this->sync_product( $product_data );
 
-            // Update progress transient
-            set_transient( 'et_sync_progress', $results, HOUR_IN_SECONDS );
+                    // Update progress transient
+                    set_transient( 'et_sync_progress', $results, HOUR_IN_SECONDS );
 
-            if ( isset( $result['error'] ) ) {
-                $results['errors']++;
-                $logger->record_error(
-                    $result['error'],
-                    isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
-                );
-            } elseif ( $result['action'] === 'created' ) {
-                $results['created']++;
-                $logger->record_created( $result['product_id'], $result['sku'] );
-            } elseif ( $result['action'] === 'updated' ) {
-                $results['updated']++;
-                $logger->record_updated( $result['product_id'], $result['sku'] );
+                    if ( isset( $result['error'] ) ) {
+                        $results['errors']++;
+                        $logger->record_error(
+                            $result['error'],
+                            isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
+                        );
+                    } elseif ( $result['action'] === 'created' ) {
+                        $results['created']++;
+                        $logger->record_created( $result['product_id'], $result['sku'] );
+                    } elseif ( $result['action'] === 'updated' ) {
+                        $results['updated']++;
+                        $logger->record_updated( $result['product_id'], $result['sku'] );
+                    }
+                } catch ( Exception $e ) {
+                    $results['errors']++;
+                    $logger->record_error(
+                        $e->getMessage(),
+                        isset( $product_data['item']['id'] ) ? $product_data['item']['id'] : ''
+                    );
+                }
             }
-        }
 
-        // Complete logging
-        $logger->complete_log( $results['errors'] > 0 ? 'partial' : 'completed' );
+            // Complete logging
+            $logger->complete_log( $results['errors'] > 0 ? 'partial' : 'completed' );
+
+        } catch ( Exception $e ) {
+            // Fatal error - mark log as failed
+            $logger->mark_as_failed( $e->getMessage() );
+
+            // Clear running flag
+            delete_transient( 'et_sync_running' );
+            delete_transient( 'et_sync_progress' );
+
+            return array(
+                'success' => false,
+                'message' => $e->getMessage(),
+                'results' => $results,
+            );
+        }
 
         // Clear running flag
         delete_transient( 'et_sync_running' );
