@@ -176,10 +176,10 @@ class ET_Admin {
                 <table class="form-table">
                     <tr>
                         <th scope="row">
-                            <label for="et_api_email"><?php esc_html_e( 'API Email', 'easytuner-sync-pro' ); ?></label>
+                            <label for="et_api_email"><?php esc_html_e( 'API Username', 'easytuner-sync-pro' ); ?></label>
                         </th>
                         <td>
-                            <input type="email" id="et_api_email" name="et_api_email"
+                            <input type="text" id="et_api_email" name="et_api_email"
                                    value="<?php echo esc_attr( $email ); ?>" class="regular-text">
                         </td>
                     </tr>
@@ -499,11 +499,11 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
         }
 
-        $email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+        $email    = isset( $_POST['email'] ) ? sanitize_text_field( wp_unslash( $_POST['email'] ) ) : '';
         $password = isset( $_POST['password'] ) ? sanitize_text_field( wp_unslash( $_POST['password'] ) ) : '';
 
         if ( empty( $email ) || empty( $password ) ) {
-            wp_send_json_error( array( 'message' => __( 'Please enter both email and password.', 'easytuner-sync-pro' ) ) );
+            wp_send_json_error( array( 'message' => __( 'Please enter both username and password.', 'easytuner-sync-pro' ) ) );
         }
 
         $api    = ET_Sync()->api;
@@ -600,7 +600,7 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
         }
 
-        $email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+        $email      = isset( $_POST['email'] ) ? sanitize_text_field( wp_unslash( $_POST['email'] ) ) : '';
         $password   = isset( $_POST['password'] ) ? sanitize_text_field( wp_unslash( $_POST['password'] ) ) : '';
         $batch_size = isset( $_POST['batch_size'] ) ? max( 1, min( 100, absint( $_POST['batch_size'] ) ) ) : 20;
         $auto_sync  = isset( $_POST['auto_sync'] ) ? 1 : 0;
