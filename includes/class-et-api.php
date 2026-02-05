@@ -90,7 +90,7 @@ class ET_API {
         $url      = $this->base_url . '/User/Login';
         $args     = $this->get_request_args( array(
             'body' => array(
-                'Email'    => sanitize_email( $email ),
+                'Email'    => sanitize_text_field( $email ),
                 'Password' => $password,
             ),
         ) );
