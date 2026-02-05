@@ -1,0 +1,321 @@
+/**
+ * EasyTuner Sync Pro Admin Styles
+ *
+ * @package EasyTuner_Sync_Pro
+ * @since 2.0.0
+ */
+
+/* General Admin Styles */
+.et-sync-admin {
+    max-width: 1200px;
+}
+
+.et-sync-admin h1 {
+    margin-bottom: 20px;
+}
+
+.et-sync-tab-content {
+    background: #fff;
+    padding: 20px;
+    margin-top: 0;
+    border: 1px solid #c3c4c7;
+    border-top: none;
+}
+
+/* Settings Tab */
+.et-sync-settings .form-table th {
+    width: 200px;
+}
+
+/* Category Mapping Tab */
+.et-sync-mapping #et-mapping-table {
+    margin-top: 20px;
+}
+
+.et-sync-mapping #et-mapping-table th,
+.et-sync-mapping #et-mapping-table td {
+    padding: 12px 10px;
+    vertical-align: middle;
+}
+
+.et-sync-mapping #et-mapping-table th:first-child,
+.et-sync-mapping #et-mapping-table td:first-child {
+    width: 60px;
+    text-align: center;
+}
+
+.et-sync-mapping #et-mapping-table th:nth-child(3),
+.et-sync-mapping #et-mapping-table td:nth-child(3) {
+    width: 80px;
+    text-align: center;
+}
+
+.et-sync-mapping select {
+    min-width: 200px;
+}
+
+.et-no-categories td {
+    padding: 20px !important;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+/* Sync Control Tab */
+.et-sync-control .et-sync-status-panel {
+    background: #f6f7f7;
+    padding: 15px 20px;
+    border-left: 4px solid #2271b1;
+    margin-bottom: 30px;
+}
+
+.et-sync-control .et-sync-running {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.et-sync-control .et-sync-running .spinner {
+    float: none;
+    margin: 0;
+}
+
+/* Progress Bar */
+.et-progress-bar {
+    height: 20px;
+    background: #e5e5e5;
+    border-radius: 3px;
+    margin: 15px 0 10px;
+    overflow: hidden;
+}
+
+.et-progress-fill {
+    height: 100%;
+    background: #2271b1;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.et-progress-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #666;
+}
+
+.et-progress-text {
+    font-weight: 600;
+}
+
+.et-progress-details {
+    color: #888;
+}
+
+/* Result Messages */
+.et-result-message {
+    padding: 12px 15px;
+    margin-top: 15px;
+    border-radius: 3px;
+}
+
+.et-result-message.success {
+    background: #d1e7dd;
+    border: 1px solid #a3cfbb;
+    color: #0a5132;
+}
+
+.et-result-message.error {
+    background: #f8d7da;
+    border: 1px solid #f1aeb5;
+    color: #58151c;
+}
+
+.et-result-message.info {
+    background: #cfe2ff;
+    border: 1px solid #9ec5fe;
+    color: #084298;
+}
+
+/* Sync Logs Tab */
+.et-sync-logs table {
+    margin-top: 15px;
+}
+
+.et-sync-logs th,
+.et-sync-logs td {
+    padding: 10px 12px;
+}
+
+.et-error-count {
+    display: inline-block;
+    background: #d63638;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.et-status-completed {
+    color: #0a5132;
+    font-weight: 500;
+}
+
+.et-status-partial {
+    color: #856404;
+    font-weight: 500;
+}
+
+.et-status-failed {
+    color: #58151c;
+    font-weight: 500;
+}
+
+.et-status-in_progress {
+    color: #084298;
+    font-weight: 500;
+}
+
+.et-status-cancelled {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Modal Styles */
+.et-modal {
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.et-modal-content {
+    background: #fff;
+    padding: 30px;
+    border-radius: 4px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.et-modal-close {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+}
+
+.et-modal-close:hover {
+    color: #000;
+}
+
+#et-error-list {
+    margin-top: 15px;
+}
+
+#et-error-list .et-error-item {
+    padding: 10px 12px;
+    background: #f8d7da;
+    border: 1px solid #f1aeb5;
+    border-radius: 3px;
+    margin-bottom: 8px;
+}
+
+#et-error-list .et-error-item:last-child {
+    margin-bottom: 0;
+}
+
+#et-error-list .et-error-time {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 3px;
+}
+
+#et-error-list .et-error-sku {
+    font-weight: 600;
+    color: #58151c;
+}
+
+#et-error-list .et-error-message {
+    margin-top: 5px;
+    color: #58151c;
+}
+
+/* Responsive Adjustments */
+@media screen and (max-width: 782px) {
+    .et-sync-settings .form-table th {
+        width: auto;
+    }
+    
+    .et-sync-mapping select {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .et-progress-stats {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+/* Loading States */
+.et-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.et-loading .button {
+    cursor: wait;
+}
+
+/* Button Styles */
+.et-sync-admin .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.et-sync-admin .button .spinner {
+    float: none;
+    margin: 0;
+}
+
+/* Tablenav */
+.et-sync-logs .tablenav {
+    margin-top: 15px;
+}
+
+.et-sync-logs .tablenav-pages {
+    float: none;
+}
+
+.et-sync-logs .tablenav-pages .page-numbers {
+    display: inline-block;
+    padding: 5px 10px;
+    margin: 0 2px;
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    color: #2271b1;
+    text-decoration: none;
+}
+
+.et-sync-logs .tablenav-pages .page-numbers.current {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+.et-sync-logs .tablenav-pages .page-numbers:hover:not(.current) {
+    background: #e5e5e5;
+}
