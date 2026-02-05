@@ -64,6 +64,61 @@ class ET_Logger {
     }
 
     /**
+     * Set the current log ID.
+     *
+     * This method is used to restore the logger state across AJAX requests.
+     *
+     * @param int $log_id Log entry ID.
+     */
+    public function set_log_id( $log_id ) {
+        $this->current_log_id = absint( $log_id );
+        $this->load_log_state();
+    }
+
+    /**
+     * Get the current log ID.
+     *
+     * @return int|null Current log ID or null.
+     */
+    public function get_log_id() {
+        return $this->current_log_id;
+    }
+
+    /**
+     * Load the current log state from the database.
+     *
+     * This restores the counters and errors from an existing log entry.
+     */
+    private function load_log_state() {
+        if ( ! $this->current_log_id ) {
+            return;
+        }
+
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $log = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT products_created, products_updated, error_details FROM {$this->table_name} WHERE id = %d",
+                $this->current_log_id
+            ),
+            ARRAY_A
+        );
+
+        if ( $log ) {
+            $this->products_created = absint( $log['products_created'] );
+            $this->products_updated = absint( $log['products_updated'] );
+
+            if ( ! empty( $log['error_details'] ) ) {
+                $errors = json_decode( $log['error_details'], true );
+                $this->errors = is_array( $errors ) ? $errors : array();
+            } else {
+                $this->errors = array();
+            }
+        }
+    }
+
+    /**
      * Start a new sync log entry.
      *
      * @param string $sync_type Type of sync (manual, scheduled, background).
@@ -328,6 +383,36 @@ class ET_Logger {
                 $days
             )
         );
+    }
+
+    /**
+     * Delete a single log entry by ID.
+     *
+     * @param int $log_id Log entry ID to delete.
+     * @return bool True on success, false on failure.
+     */
+    public function delete_log( $log_id ) {
+        global $wpdb;
+
+        $result = $wpdb->delete(
+            $this->table_name,
+            array( 'id' => absint( $log_id ) ),
+            array( '%d' )
+        );
+
+        return false !== $result;
+    }
+
+    /**
+     * Delete all log entries.
+     *
+     * @return int|false Number of deleted entries, or false on failure.
+     */
+    public function delete_all_logs() {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from trusted wpdb prefix.
+        return $wpdb->query( "DELETE FROM {$this->table_name}" );
     }
 
     /**
