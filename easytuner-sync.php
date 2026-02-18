@@ -12,6 +12,8 @@
  * Requires PHP: 7.4
  * WC requires at least: 5.0
  * WC tested up to: 8.5
+ * License:     GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
  * @package EasyTuner_Sync_Pro
  */
@@ -27,6 +29,31 @@ define( 'ET_SYNC_PLUGIN_FILE', __FILE__ );
 define( 'ET_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ET_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ET_SYNC_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+
+// PSR-4 SPL Autoloader — maps AutoSync\ to src/
+spl_autoload_register( function ( $class ) {
+    $prefix   = 'AutoSync\\';
+    $base_dir = ET_SYNC_PLUGIN_DIR . 'src/';
+    $len      = strlen( $prefix );
+
+    if ( strncmp( $prefix, $class, $len ) !== 0 ) {
+        return;
+    }
+
+    $relative_class = substr( $class, $len );
+    $file           = $base_dir . str_replace( '\\', '/', $relative_class ) . '.php';
+
+    if ( file_exists( $file ) ) {
+        require $file;
+    }
+} );
+
+use AutoSync\Admin;
+use AutoSync\API;
+use AutoSync\Image;
+use AutoSync\Logger;
+use AutoSync\Scheduler;
+use AutoSync\Sync;
 
 /**
  * Main EasyTuner Sync Pro class.
@@ -45,42 +72,42 @@ final class EasyTuner_Sync_Pro {
     /**
      * API handler instance.
      *
-     * @var ET_API
+     * @var API
      */
     public $api;
 
     /**
-     * Admin handler instance.
+     * Admin handler instance (null outside admin context).
      *
-     * @var ET_Admin
+     * @var Admin|null
      */
     public $admin;
 
     /**
      * Sync handler instance.
      *
-     * @var ET_Sync
+     * @var Sync
      */
     public $sync;
 
     /**
      * Image handler instance.
      *
-     * @var ET_Image
+     * @var Image
      */
     public $image;
 
     /**
      * Scheduler handler instance.
      *
-     * @var ET_Scheduler
+     * @var Scheduler
      */
     public $scheduler;
 
     /**
      * Logger instance.
      *
-     * @var ET_Logger
+     * @var Logger
      */
     public $logger;
 
@@ -100,20 +127,7 @@ final class EasyTuner_Sync_Pro {
      * Constructor.
      */
     private function __construct() {
-        $this->includes();
         $this->init_hooks();
-    }
-
-    /**
-     * Include required files.
-     */
-    private function includes() {
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-api.php';
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-image.php';
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-logger.php';
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-sync.php';
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-scheduler.php';
-        require_once ET_SYNC_PLUGIN_DIR . 'includes/class-et-admin.php';
     }
 
     /**
@@ -143,15 +157,15 @@ final class EasyTuner_Sync_Pro {
         }
 
         // Initialize components
-        $this->api       = new ET_API();
-        $this->image     = new ET_Image();
-        $this->logger    = new ET_Logger();
-        $this->sync      = new ET_Sync();
-        $this->scheduler = new ET_Scheduler();
+        $this->api       = new API();
+        $this->image     = new Image();
+        $this->logger    = new Logger();
+        $this->sync      = new Sync();
+        $this->scheduler = new Scheduler();
 
         // Initialize admin only in admin context
         if ( is_admin() ) {
-            $this->admin = new ET_Admin();
+            $this->admin = new Admin();
         }
 
         // Load text domain for translations
@@ -170,8 +184,8 @@ final class EasyTuner_Sync_Pro {
 
         // Schedule daily sync if Action Scheduler is available
         if ( function_exists( 'as_schedule_recurring_action' ) ) {
-            if ( ! as_next_scheduled_action( 'et_sync_scheduled_task' ) ) {
-                as_schedule_recurring_action( strtotime( 'tomorrow 3:00am' ), DAY_IN_SECONDS, 'et_sync_scheduled_task' );
+            if ( ! as_next_scheduled_action( Scheduler::SCHEDULED_SYNC_HOOK ) ) {
+                as_schedule_recurring_action( strtotime( 'tomorrow 3:00am' ), DAY_IN_SECONDS, Scheduler::SCHEDULED_SYNC_HOOK );
             }
         }
 
@@ -185,8 +199,8 @@ final class EasyTuner_Sync_Pro {
     public function deactivate() {
         // Unschedule Action Scheduler tasks
         if ( function_exists( 'as_unschedule_all_actions' ) ) {
-            as_unschedule_all_actions( 'et_sync_scheduled_task' );
-            as_unschedule_all_actions( 'et_sync_batch_process' );
+            as_unschedule_all_actions( Scheduler::SCHEDULED_SYNC_HOOK );
+            as_unschedule_all_actions( Scheduler::BATCH_PROCESS_HOOK );
         }
 
         // Flush rewrite rules
@@ -274,13 +288,13 @@ final class EasyTuner_Sync_Pro {
 }
 
 /**
- * Get the main instance of EasyTuner Sync Pro.
+ * Get the main EasyTuner Sync Pro plugin instance.
  *
  * @return EasyTuner_Sync_Pro
  */
-function ET_Sync() {
+function EasyTunerPlugin() {
     return EasyTuner_Sync_Pro::instance();
 }
 
 // Initialize the plugin
-ET_Sync();
+EasyTunerPlugin();

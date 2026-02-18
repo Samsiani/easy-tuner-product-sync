@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner Product Sync Handler
+ * Sync — Orchestrates batch product synchronisation from the remote API.
  *
- * Handles the product synchronization logic with WooCommerce.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_Sync class.
+ * Sync class.
  *
  * @since 2.0.0
  */
-class ET_Sync {
+class Sync {
 
     /**
      * Batch size for processing.
@@ -53,7 +53,7 @@ class ET_Sync {
         }
 
         // Get products from API
-        $api      = ET_Sync()->api;
+        $api      = EasyTunerPlugin()->api;
         $products = $api->get_products_for_sync();
 
         if ( is_wp_error( $products ) ) {
@@ -69,7 +69,7 @@ class ET_Sync {
         set_transient( $sync_id, $products, HOUR_IN_SECONDS );
 
         // Start logger
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $log_id = $logger->start_log( 'manual' );
 
         wp_send_json_success( array(
@@ -120,7 +120,7 @@ class ET_Sync {
             'errors'  => array(),
         );
 
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
 
         // Set log ID to persist state across AJAX requests
         if ( $log_id > 0 ) {
@@ -145,7 +145,7 @@ class ET_Sync {
                         $results['updated']++;
                         $logger->record_updated( $result['product_id'], $result['sku'] );
                     }
-                } catch ( Exception $e ) {
+                } catch ( \Exception $e ) {
                     $error_message = sprintf(
                         /* translators: 1: SKU, 2: Error message */
                         __( 'Exception processing SKU %1$s: %2$s', 'easytuner-sync-pro' ),
@@ -186,7 +186,7 @@ class ET_Sync {
                         count( $products )
                     ),
             ) );
-        } catch ( Exception $e ) {
+        } catch ( \Exception $e ) {
             // Fatal error during batch processing - mark log as failed
             $logger->mark_as_failed( $e->getMessage() );
             delete_transient( $sync_id );
@@ -226,7 +226,7 @@ class ET_Sync {
         }
 
         // Get latest log
-        $logger     = ET_Sync()->logger;
+        $logger     = EasyTunerPlugin()->logger;
         $latest_log = $logger->get_latest_log();
 
         wp_send_json_success( array(
@@ -262,7 +262,7 @@ class ET_Sync {
         }
 
         // Mark the log as failed
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
 
         // Set log ID to persist state across AJAX requests
         if ( $log_id > 0 ) {
@@ -306,7 +306,7 @@ class ET_Sync {
                 // New product - create with full data
                 return $this->create_new_product( $item, $wc_category_id );
             }
-        } catch ( Exception $e ) {
+        } catch ( \Exception $e ) {
             return array(
                 'error' => sprintf(
                     /* translators: 1: SKU, 2: Error message */
@@ -326,7 +326,7 @@ class ET_Sync {
      * @return array Result array.
      */
     private function create_new_product( $item, $wc_category_id ) {
-        $product = new WC_Product_Simple();
+        $product = new \WC_Product_Simple();
 
         // Set SKU
         $sku = sanitize_text_field( $item['id'] );
@@ -368,12 +368,12 @@ class ET_Sync {
 
         // Process featured image
         if ( isset( $item['photoIds'] ) && is_array( $item['photoIds'] ) && ! empty( $item['photoIds'] ) ) {
-            $image_handler = ET_Sync()->image;
+            $image_handler = EasyTunerPlugin()->image;
             $image_result  = $image_handler->process_product_image( $item, $product_id );
 
             if ( ! $image_result['success'] ) {
                 // Log image error but don't fail the product creation
-                ET_Sync()->logger->record_error(
+                EasyTunerPlugin()->logger->record_error(
                     $image_result['message'],
                     $sku,
                     'image_download'
@@ -441,7 +441,7 @@ class ET_Sync {
         set_transient( 'et_sync_running', true, HOUR_IN_SECONDS );
 
         // Get products from API
-        $api      = ET_Sync()->api;
+        $api      = EasyTunerPlugin()->api;
         $products = $api->get_products_for_sync();
 
         if ( is_wp_error( $products ) ) {
@@ -461,7 +461,7 @@ class ET_Sync {
         }
 
         // Start logging
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $logger->start_log( $sync_type );
 
         $results = array(
@@ -491,7 +491,7 @@ class ET_Sync {
                         $results['updated']++;
                         $logger->record_updated( $result['product_id'], $result['sku'] );
                     }
-                } catch ( Exception $e ) {
+                } catch ( \Exception $e ) {
                     $results['errors']++;
                     $logger->record_error(
                         $e->getMessage(),
@@ -503,7 +503,7 @@ class ET_Sync {
             // Complete logging
             $logger->complete_log( $results['errors'] > 0 ? 'partial' : 'completed' );
 
-        } catch ( Exception $e ) {
+        } catch ( \Exception $e ) {
             // Fatal error - mark log as failed
             $logger->mark_as_failed( $e->getMessage() );
 

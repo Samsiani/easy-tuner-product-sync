@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner Sync Logger
+ * Logger — Records sync activity and errors to the plugin log table.
  *
- * Handles logging of sync operations and errors.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_Logger class.
+ * Logger class.
  *
  * @since 2.0.0
  */
-class ET_Logger {
+class Logger {
 
     /**
      * Database table name.

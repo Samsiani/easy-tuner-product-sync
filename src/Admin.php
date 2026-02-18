@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner Admin Interface
+ * Admin — Registers the admin menu, settings page, and all AJAX handlers.
  *
- * Handles the admin UI with tabbed interface for settings, category mapping, sync control, and logs.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_Admin class.
+ * Admin class.
  *
  * @since 2.0.0
  */
-class ET_Admin {
+class Admin {
 
     /**
      * Admin page slug.
@@ -350,7 +350,7 @@ class ET_Admin {
      * Render the Sync Control tab.
      */
     private function render_sync_tab() {
-        $scheduler   = ET_Sync()->scheduler;
+        $scheduler   = EasyTunerPlugin()->scheduler;
         $is_running  = $scheduler->is_sync_running();
         $next_sync   = $scheduler->get_next_scheduled_sync();
         ?>
@@ -411,7 +411,7 @@ class ET_Admin {
      * Render the Sync Logs tab.
      */
     private function render_logs_tab() {
-        $logger   = ET_Sync()->logger;
+        $logger   = EasyTunerPlugin()->logger;
         $page     = isset( $_GET['log_page'] ) ? max( 1, absint( $_GET['log_page'] ) ) : 1;
         $per_page = 20;
         $logs     = $logger->get_logs( $page, $per_page );
@@ -527,7 +527,7 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Please enter both username and password.', 'easytuner-sync-pro' ) ) );
         }
 
-        $api    = ET_Sync()->api;
+        $api    = EasyTunerPlugin()->api;
         $result = $api->test_connection( $email, $password );
 
         if ( is_wp_error( $result ) ) {
@@ -547,7 +547,7 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
         }
 
-        $api        = ET_Sync()->api;
+        $api        = EasyTunerPlugin()->api;
         $categories = $api->get_categories_for_mapping();
 
         if ( is_wp_error( $categories ) ) {
@@ -632,7 +632,7 @@ class ET_Admin {
         update_option( 'et_auto_sync', $auto_sync );
 
         // Update scheduled sync
-        $scheduler = ET_Sync()->scheduler;
+        $scheduler = EasyTunerPlugin()->scheduler;
         $scheduler->schedule_daily_sync();
 
         wp_send_json_success( array( 'message' => __( 'Settings saved successfully!', 'easytuner-sync-pro' ) ) );
@@ -654,7 +654,7 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Invalid log ID.', 'easytuner-sync-pro' ) ) );
         }
 
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $result = $logger->delete_log( $log_id );
 
         if ( $result ) {
@@ -674,7 +674,7 @@ class ET_Admin {
             wp_send_json_error( array( 'message' => __( 'Permission denied.', 'easytuner-sync-pro' ) ) );
         }
 
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $result = $logger->delete_all_logs();
 
         if ( false !== $result ) {

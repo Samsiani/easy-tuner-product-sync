@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner Image Handler
+ * Image — Downloads remote images and attaches them to WooCommerce products.
  *
- * Handles image downloading, deduplication, and attachment management.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_Image class.
+ * Image class.
  *
  * @since 2.0.0
  */
-class ET_Image {
+class Image {
 
     /**
      * Meta key for storing source URL for deduplication.
@@ -43,11 +43,11 @@ class ET_Image {
      *
      * @param string $url     The image URL from the API.
      * @param int    $post_id The product post ID to attach the image to.
-     * @return int|WP_Error Attachment ID on success, WP_Error on failure.
+     * @return int|\WP_Error Attachment ID on success, WP_Error on failure.
      */
     public function get_or_download_image( $url, $post_id ) {
         if ( empty( $url ) ) {
-            return new WP_Error( 'empty_url', __( 'Image URL is empty.', 'easytuner-sync-pro' ) );
+            return new \WP_Error( 'empty_url', __( 'Image URL is empty.', 'easytuner-sync-pro' ) );
         }
 
         // Normalize URL for comparison
@@ -91,7 +91,7 @@ class ET_Image {
      *
      * @param string $url     The image URL to download.
      * @param int    $post_id The product post ID to attach the image to.
-     * @return int|WP_Error Attachment ID on success, WP_Error on failure.
+     * @return int|\WP_Error Attachment ID on success, WP_Error on failure.
      */
     public function download_and_import_image( $url, $post_id ) {
         // Load required WordPress files
@@ -112,7 +112,7 @@ class ET_Image {
         ) );
 
         if ( is_wp_error( $response ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'download_failed',
                 sprintf(
                     /* translators: %s: Error message */
@@ -127,7 +127,7 @@ class ET_Image {
         $content_type    = wp_remote_retrieve_header( $response, 'content-type' );
 
         if ( 200 !== $response_code || empty( $image_contents ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'download_failed',
                 sprintf(
                     /* translators: %d: HTTP response code */
@@ -139,7 +139,7 @@ class ET_Image {
 
         // Validate content type is an image
         if ( ! $this->is_valid_image_type( $content_type ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'invalid_image_type',
                 sprintf(
                     /* translators: %s: Content type */
@@ -156,7 +156,7 @@ class ET_Image {
         $upload = wp_upload_bits( $filename, null, $image_contents );
 
         if ( ! empty( $upload['error'] ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'upload_failed',
                 sprintf(
                     /* translators: %s: Error message */
@@ -187,7 +187,7 @@ class ET_Image {
      * @param array  $upload   Upload data from wp_upload_bits.
      * @param int    $post_id  Parent post ID.
      * @param string $filename Original filename.
-     * @return int|WP_Error Attachment ID on success, WP_Error on failure.
+     * @return int|\WP_Error Attachment ID on success, WP_Error on failure.
      */
     private function create_attachment( $upload, $post_id, $filename ) {
         $file_path = $upload['file'];
@@ -203,7 +203,7 @@ class ET_Image {
         $attachment_id = wp_insert_attachment( $attachment_data, $file_path, $post_id );
 
         if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'attachment_failed',
                 __( 'Failed to create attachment.', 'easytuner-sync-pro' )
             );

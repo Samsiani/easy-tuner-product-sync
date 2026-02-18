@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner API Handler
+ * API — Handles all HTTP communication with the EasyTuner remote API.
  *
- * Handles all API communication with the EasyTuner server.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_API class.
+ * API class.
  *
  * @since 2.0.0
  */
-class ET_API {
+class API {
 
     /**
      * API Base URL.
@@ -68,7 +68,7 @@ class ET_API {
      *
      * @param string|null $email    Email address (uses saved option if null).
      * @param string|null $password Password (uses saved option if null).
-     * @return string|WP_Error Token on success, WP_Error on failure.
+     * @return string|\WP_Error Token on success, WP_Error on failure.
      */
     public function authenticate( $email = null, $password = null ) {
         // Use saved credentials if not provided
@@ -81,7 +81,7 @@ class ET_API {
 
         // Validate credentials are present
         if ( empty( $email ) || empty( $password ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'missing_credentials',
                 __( 'API credentials are not configured.', 'easytuner-sync-pro' )
             );
@@ -98,7 +98,7 @@ class ET_API {
         $response = wp_remote_post( $url, $args );
 
         if ( is_wp_error( $response ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'api_connection_error',
                 sprintf(
                     /* translators: %s: Error message */
@@ -113,7 +113,7 @@ class ET_API {
 
         if ( 200 !== $response_code ) {
             $error_message = isset( $body['message'] ) ? $body['message'] : __( 'Unknown error', 'easytuner-sync-pro' );
-            return new WP_Error(
+            return new \WP_Error(
                 'api_auth_error',
                 sprintf(
                     /* translators: 1: Response code, 2: Error message */
@@ -125,7 +125,7 @@ class ET_API {
         }
 
         if ( ! isset( $body['token'] ) || empty( $body['token'] ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'invalid_token_response',
                 __( 'API did not return a valid token.', 'easytuner-sync-pro' )
             );
@@ -141,7 +141,7 @@ class ET_API {
     /**
      * Get a valid authentication token.
      *
-     * @return string|WP_Error Token on success, WP_Error on failure.
+     * @return string|\WP_Error Token on success, WP_Error on failure.
      */
     public function get_token() {
         // Return cached token if still valid
@@ -157,7 +157,7 @@ class ET_API {
      *
      * @param string $email    Email address.
      * @param string $password Password.
-     * @return array|WP_Error Connection test result or WP_Error on failure.
+     * @return array|\WP_Error Connection test result or WP_Error on failure.
      */
     public function test_connection( $email, $password ) {
         $token = $this->authenticate( $email, $password );
@@ -185,7 +185,7 @@ class ET_API {
      * Get all inventories (categories) from the API.
      *
      * @param string|null $token Optional token to use.
-     * @return array|WP_Error Inventories array or WP_Error on failure.
+     * @return array|\WP_Error Inventories array or WP_Error on failure.
      */
     public function get_inventories( $token = null ) {
         if ( is_null( $token ) ) {
@@ -205,7 +205,7 @@ class ET_API {
         $response = wp_remote_get( $url, $args );
 
         if ( is_wp_error( $response ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'api_request_error',
                 sprintf(
                     /* translators: %s: Error message */
@@ -219,7 +219,7 @@ class ET_API {
         $body          = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( 200 !== $response_code ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'api_data_error',
                 sprintf(
                     /* translators: %d: HTTP response code */
@@ -230,7 +230,7 @@ class ET_API {
         }
 
         if ( ! is_array( $body ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'invalid_response_format',
                 __( 'API returned invalid data format.', 'easytuner-sync-pro' )
             );
@@ -242,7 +242,7 @@ class ET_API {
     /**
      * Get API categories for mapping UI.
      *
-     * @return array|WP_Error Array of category names and item counts, or WP_Error.
+     * @return array|\WP_Error Array of category names and item counts, or WP_Error.
      */
     public function get_categories_for_mapping() {
         $inventories = $this->get_inventories();
@@ -283,7 +283,7 @@ class ET_API {
     /**
      * Get products for sync based on enabled categories.
      *
-     * @return array|WP_Error Array of products with category info, or WP_Error.
+     * @return array|\WP_Error Array of products with category info, or WP_Error.
      */
     public function get_products_for_sync() {
         $inventories = $this->get_inventories();

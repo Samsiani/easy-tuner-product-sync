@@ -1,24 +1,24 @@
 <?php
 /**
- * EasyTuner Background Scheduler
+ * Scheduler — Registers and manages Action Scheduler hooks for background sync.
  *
- * Handles Action Scheduler integration for background sync processing.
- *
- * @package EasyTuner_Sync_Pro
- * @since 2.0.0
+ * @package    EasyTuner_Sync_Pro
+ * @namespace  AutoSync
+ * @since      2.0.0
  */
 
-// Prevent direct access
+namespace AutoSync;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * ET_Scheduler class.
+ * Scheduler class.
  *
  * @since 2.0.0
  */
-class ET_Scheduler {
+class Scheduler {
 
     /**
      * Action hook for scheduled sync.
@@ -58,7 +58,7 @@ class ET_Scheduler {
         }
 
         // Run the full sync
-        $sync = ET_Sync()->sync;
+        $sync = EasyTunerPlugin()->sync;
         $sync->run_full_sync( 'scheduled' );
     }
 
@@ -81,8 +81,8 @@ class ET_Scheduler {
 
         // Get batch of products
         $batch  = array_slice( $products, $offset, $batch_size );
-        $sync   = ET_Sync()->sync;
-        $logger = ET_Sync()->logger;
+        $sync   = EasyTunerPlugin()->sync;
+        $logger = EasyTunerPlugin()->logger;
 
         $progress = get_transient( 'et_sync_progress' ) ?: array(
             'created' => 0,
@@ -145,19 +145,19 @@ class ET_Scheduler {
     /**
      * Start a background sync.
      *
-     * @return array|WP_Error Sync info or error.
+     * @return array|\WP_Error Sync info or error.
      */
     public function start_background_sync() {
         // Check if already running
         if ( get_transient( 'et_sync_running' ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'sync_already_running',
                 __( 'A sync is already in progress.', 'easytuner-sync-pro' )
             );
         }
 
         // Get products from API
-        $api      = ET_Sync()->api;
+        $api      = EasyTunerPlugin()->api;
         $products = $api->get_products_for_sync();
 
         if ( is_wp_error( $products ) ) {
@@ -165,7 +165,7 @@ class ET_Scheduler {
         }
 
         if ( empty( $products ) ) {
-            return new WP_Error(
+            return new \WP_Error(
                 'no_products',
                 __( 'No products to sync. Please check your category mapping.', 'easytuner-sync-pro' )
             );
@@ -187,7 +187,7 @@ class ET_Scheduler {
         ), HOUR_IN_SECONDS );
 
         // Start logger
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $logger->start_log( 'background' );
 
         // Schedule first batch
@@ -282,7 +282,7 @@ class ET_Scheduler {
         delete_transient( 'et_sync_progress' );
 
         // Complete the log as cancelled
-        $logger = ET_Sync()->logger;
+        $logger = EasyTunerPlugin()->logger;
         $logger->complete_log( 'cancelled' );
 
         return true;
